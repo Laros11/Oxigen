@@ -3,258 +3,220 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>Oxigen X3</title>
 <style>
-*{box-sizing:border-box}
-body{margin:0;overflow:hidden;background:#111;color:white;font-family:Arial}
-canvas{display:block}
-#hud{position:fixed;top:12px;left:12px;z-index:5;background:#111a;padding:12px;border-radius:10px}
-#status{color:#8fda91;font-size:13px}
-#resources{margin-top:7px;font-size:14px}
-#help{position:fixed;bottom:15px;left:50%;transform:translateX(-50%);background:#111a;padding:10px;border-radius:8px;font-size:13px;text-align:center;white-space:nowrap}
-#crosshair{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);font-size:24px;pointer-events:none}
-#mobile{display:none;position:fixed;inset:0;z-index:4;pointer-events:none}
-.control{position:absolute;pointer-events:auto;border:2px solid #ffffff80;background:#1119;color:white;border-radius:50%;width:65px;height:65px;font-size:13px}
-#jump{right:25px;bottom:35px}
-#hit{right:100px;bottom:110px}
-#stick{left:25px;bottom:35px;width:120px;height:120px;border-radius:50%;border:2px solid #ffffff70;background:#1116;pointer-events:auto}
-#knob{position:absolute;left:35px;top:35px;width:46px;height:46px;border-radius:50%;background:#ffffff80}
+*{box-sizing:border-box}body{margin:0;overflow:hidden;background:#111;color:white;font:14px Arial}
+canvas{display:block}button{background:#385b36;color:white;border:1px solid #8aa77b;padding:9px;border-radius:6px;cursor:pointer}
+#hud{position:fixed;top:10px;left:10px;background:#111c;padding:12px;border-radius:9px;z-index:3;min-width:190px}
+#status{color:#9edc9e;font-size:12px;margin:5px 0}
+#menu{position:fixed;right:10px;top:10px;z-index:4;display:flex;gap:5px;flex-wrap:wrap;max-width:300px}
+#panel{display:none;position:fixed;z-index:5;top:50%;left:50%;transform:translate(-50%,-50%);width:min(420px,94vw);max-height:80vh;overflow:auto;background:#17231fee;border:1px solid #829b78;border-radius:12px;padding:16px}
+#panel h2{margin-top:0}#items{display:grid;gap:8px}
+.entry{display:flex;justify-content:space-between;align-items:center;gap:8px;background:#ffffff12;padding:9px;border-radius:7px}
+#cross{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none}
+#hint{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);background:#111b;padding:8px;border-radius:7px}
 </style>
 </head>
 <body>
 <div id="hud">
-  <b>OXIGEN X3</b>
-  <div id="status">Подключение...</div>
-  <div id="players">Игроков: 0</div>
-  <div id="resources">🪵 Дерево: 0<br>🪨 Камень: 0</div>
+<b>OXIGEN X3</b>
+<div id="status">Подключение к серверу...</div>
+<div id="players">Игроков: 0</div>
+<div id="resources"></div>
 </div>
-<div id="crosshair">+</div>
-<div id="help">WASD — движение · Мышь — обзор · ЛКМ — добыча · Пробел — прыжок</div>
-<div id="mobile">
-  <div id="stick"><div id="knob"></div></div>
-  <button class="control" id="jump">ПРЫЖОК</button>
-  <button class="control" id="hit">УДАР</button>
+<div id="menu">
+<button onclick="openPanel('craft')">Крафт</button>
+<button onclick="openPanel('research')">Исследования</button>
+<button onclick="openPanel('build')">Строительство</button>
+<button onclick="openPanel('inventory')">Инвентарь</button>
 </div>
+<div id="panel"><button style="float:right" onclick="closePanel()">Закрыть</button><h2 id="panelTitle"></h2><div id="items"></div></div>
+<div id="cross">+</div>
+<div id="hint">WASD — движение · мышь — обзор · ЛКМ — добыча · E — взаимодействие</div>
 
 <script type="module">
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x87b8d5);
-scene.fog = new THREE.Fog(0x87b8d5, 35, 110);
-
-const camera = new THREE.PerspectiveCamera(75, innerWidth/innerHeight, 0.1, 200);
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x87b8d5);
+scene.fog=new THREE.Fog(0x87b8d5,35,120);
+const camera=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,.1,300);
 camera.position.set(0,1.7,5);
-
-const renderer = new THREE.WebGLRenderer({antialias:false});
+const renderer=new THREE.WebGLRenderer({antialias:false});
 renderer.setSize(innerWidth,innerHeight);
 renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));
 document.body.appendChild(renderer.domElement);
-
 scene.add(new THREE.HemisphereLight(0xffffff,0x52613a,2));
-const sun = new THREE.DirectionalLight(0xffffff,2);
-sun.position.set(20,40,10);
-scene.add(sun);
+const sun=new THREE.DirectionalLight(0xffffff,2);sun.position.set(20,40,10);scene.add(sun);
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(200,200),new THREE.MeshStandardMaterial({color:0x557d3d}));
+ground.rotation.x=-Math.PI/2;ground.position.y=-.05;scene.add(ground);
 
-const ground = new THREE.Mesh(
-  new THREE.PlaneGeometry(200,200),
-  new THREE.MeshStandardMaterial({color:0x557d3d})
-);
-ground.rotation.x=-Math.PI/2;
-ground.position.y=-0.05;
-scene.add(ground);
-
-const objects=[];
-const materialTree=new THREE.MeshStandardMaterial({color:0x68442b});
-const materialLeaves=new THREE.MeshStandardMaterial({color:0x286b35});
-const materialStone=new THREE.MeshStandardMaterial({color:0x858585});
-
-function createTree(x,z){
-  const group=new THREE.Group();
-  const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.22,.3,2,6),materialTree);
-  trunk.position.y=1;
-  group.add(trunk);
-  const leaves=new THREE.Mesh(new THREE.ConeGeometry(1.2,3,6),materialLeaves);
-  leaves.position.y=3;
-  group.add(leaves);
-  group.position.set(x,0,z);
-  scene.add(group);
-  objects.push({mesh:group,type:'wood',amount:30,hits:0});
-}
-
-function createStone(x,z){
-  const mesh=new THREE.Mesh(new THREE.DodecahedronGeometry(.8,0),materialStone);
-  mesh.position.set(x,.65,z);
-  mesh.scale.set(1.2,.8,1);
-  scene.add(mesh);
-  objects.push({mesh,type:'stone',amount:20,hits:0});
-}
-
-for(let i=0;i<45;i++){
-  const x=(Math.random()-.5)*75;
-  const z=(Math.random()-.5)*75;
-  if(Math.abs(x)<5 && Math.abs(z)<5) continue;
-  if(Math.random()>.35) createTree(x,z);
-  else createStone(x,z);
-}
-
-const keys={};
-let yaw=0,pitch=0,velocityY=0,onGround=true;
-let wood=0,stone=0;
-const speed=5;
+let ws,playerId=null,inventory={},research=[];
 const status=document.getElementById('status');
-const players=document.getElementById('players');
+function send(data){if(ws&&ws.readyState===WebSocket.OPEN)ws.send(JSON.stringify(data));else alert('Нет соединения с сервером');}
+function connect(){
+ ws=new WebSocket('wss://oxigen.onrender.com/ws');
+ ws.onopen=()=>{status.textContent='Сервер подключён';send({type:'join',nickname:'Survivor'});};
+ ws.onmessage=e=>{
+  const d=JSON.parse(e.data);
+  if(d.type==='welcome'){playerId=d.player_id;}
+  if(d.type==='joined'){playerId=d.player_id;inventory=d.inventory||{};research=d.research||[];renderInventory();(d.buildings||[]).forEach(addBuilding);}
+  if(d.type==='inventory'){inventory=d.inventory||{};renderInventory();if(d.message)notify(d.message);}
+  if(d.type==='research'){research=d.research||[];inventory=d.inventory||{};renderInventory();notify(d.message);}
+  if(d.type==='players'){document.getElementById('players').textContent='Игроков: '+d.players.length;}
+  if(d.type==='building_added')addBuilding(d.building);
+  if(d.type==='building_updated')updateBuilding(d.building);
+  if(d.type==='building_removed')removeBuilding(d.id);
+  if(d.type==='error')notify(d.message);
+ };
+ ws.onclose=()=>status.textContent='Сервер отключён — обнови страницу';
+ ws.onerror=()=>status.textContent='Ошибка подключения';
+}
+connect();
 
-const ws=new WebSocket('wss://oxigen.onrender.com/ws');
-ws.onopen=()=>{
-  status.textContent='Сервер подключён';
-  ws.send(JSON.stringify({type:'join',nickname:'Survivor'}));
-};
-ws.onmessage=e=>{
-  try{
-    const data=JSON.parse(e.data);
-    if(data.type==='players') players.textContent='Игроков: '+data.players.length;
-    if(data.type==='welcome') status.textContent='На сервере';
-  }catch{}
-};
-ws.onerror=()=>status.textContent='Ошибка подключения';
-ws.onclose=()=>status.textContent='Сервер отключён';
+function renderInventory(){
+ const names={wood:'Дерево',stone:'Камень',metal_ore:'Металл',sulfur_ore:'Сера',scrap:'Скрап',workbench:'Верстак',hatchet:'Топор',pickaxe:'Кирка',spear:'Копьё',bow:'Лук',arrows:'Стрелы'};
+ document.getElementById('resources').innerHTML=Object.entries(names).map(([k,n])=>`${n}: ${inventory[k]||0}`).join('<br>');
+}
+function notify(s){status.textContent=s;setTimeout(()=>{if(status.textContent===s)status.textContent='Сервер подключён';},2500);}
 
-document.addEventListener('keydown',e=>{
-  keys[e.code]=true;
-  if(e.code==='Space' && onGround){
-    velocityY=7;
-    onGround=false;
-  }
-});
+const recipes=[
+ ['workbench','Верстак I уровня','300 дерева, 100 камня, 50 скрапа'],
+ ['hatchet','Топор','100 дерева, 50 камня'],
+ ['pickaxe','Кирка','100 дерева, 80 камня'],
+ ['spear','Копьё','150 дерева, 50 камня — нужен чертёж'],
+ ['bow','Лук','200 дерева, 30 скрапа — нужен чертёж']
+];
+const structures=[
+ ['foundation','Фундамент — 100 дерева'],
+ ['wall','Стена — 75 дерева'],
+ ['door','Дверь — 90 дерева'],
+ ['window','Оконная стена — 85 дерева'],
+ ['roof','Крыша — 75 дерева']
+];
+function openPanel(type){
+ const panel=document.getElementById('panel'),items=document.getElementById('items');
+ panel.style.display='block';items.innerHTML='';
+ const add=(name,description,action,label='Создать')=>{
+  const row=document.createElement('div');row.className='entry';
+  const span=document.createElement('span');span.textContent=name+' — '+description;
+  const btn=document.createElement('button');btn.textContent=label;btn.onclick=action;
+  row.append(span,btn);items.append(row);
+ };
+ if(type==='craft'){
+  document.getElementById('panelTitle').textContent='Крафт';
+  recipes.forEach(([id,n,c])=>add(n,c,()=>send({type:'craft',item:id})));
+ }else if(type==='research'){
+  document.getElementById('panelTitle').textContent='Исследования — 40 скрапа';
+  recipes.filter(x=>['spear','bow'].includes(x[0])).forEach(([id,n])=>{
+   add(n,research.includes(id)?'Изучено':'Чертёж',()=>send({type:'research',item:id}),research.includes(id)?'Изучено':'Изучить');
+  });
+ }else if(type==='build'){
+  document.getElementById('panelTitle').textContent='Строительство — выбери деталь, затем кликни по земле';
+  structures.forEach(([id,n])=>add(n,'Разместить',()=>{selectedBuild=id;notify('Выбрано: '+n+' — нажми ЛКМ по земле');closePanel();},'Выбрать'));
+  add('Улучшение','Камень: 100 / металл: 150',()=>{const b=nearestOwnedBuilding();if(b)send({type:'upgrade',id:b.id});else notify('Рядом нет твоих построек');},'Улучшить');
+  add('Демонтаж','Убрать свою постройку',()=>{const b=nearestOwnedBuilding();if(b)send({type:'demolish',id:b.id});else notify('Рядом нет твоих построек');},'Убрать');
+ }else{
+  document.getElementById('panelTitle').textContent='Инвентарь';
+  Object.entries(inventory).forEach(([k,v])=>add(k,String(v),()=>{},''));
+ }
+}
+function closePanel(){document.getElementById('panel').style.display='none';}
+window.openPanel=openPanel;window.closePanel=closePanel;
+
+const buildingMeshes=new Map();
+const buildMaterials=[0x85613b,0x888888,0x65747a];
+function makeBuilding(b){
+ const g=new THREE.Group();let mesh;
+ const mat=new THREE.MeshStandardMaterial({color:buildMaterials[Math.max(0,Math.min(2,b.level-1))]});
+ if(b.kind==='foundation')mesh=new THREE.Mesh(new THREE.BoxGeometry(3,.35,3),mat);
+ else if(b.kind==='wall')mesh=new THREE.Mesh(new THREE.BoxGeometry(3,2.5,.25),mat);
+ else if(b.kind==='door'){
+  const left=new THREE.Mesh(new THREE.BoxGeometry(.25,2.5,.25),mat);
+  const right=left.clone();right.position.x=1.35;g.add(left,right);
+  mesh=new THREE.Mesh(new THREE.BoxGeometry(2.5,.25,.25),mat);mesh.position.y=1.15;
+ }else if(b.kind==='window'){
+  const a=new THREE.Mesh(new THREE.BoxGeometry(3, .7,.25),mat);a.position.y=.9;
+  const c=a.clone();c.position.y=-.9;g.add(a,c);
+  const side=new THREE.Mesh(new THREE.BoxGeometry(.25,1.1,.25),mat);side.position.x=-1.35;
+  const side2=side.clone();side2.position.x=1.35;g.add(side,side2);
+ }else mesh=new THREE.Mesh(new THREE.BoxGeometry(3,.2,3),mat);
+ if(mesh)g.add(mesh);
+ g.position.set(b.x,b.y,b.z);g.rotation.y=b.rotation||0;scene.add(g);
+ buildingMeshes.set(b.id,{group:g,data:b});
+}
+function addBuilding(b){if(!buildingMeshes.has(b.id))makeBuilding(b);}
+function updateBuilding(b){removeBuilding(b.id);makeBuilding(b);}
+function removeBuilding(id){const b=buildingMeshes.get(id);if(b){scene.remove(b.group);buildingMeshes.delete(id);}}
+function nearestOwnedBuilding(){
+ let best=null,dist=5;
+ for(const b of buildingMeshes.values()){
+  if(b.data.owner_id!==playerId)continue;
+  const d=camera.position.distanceTo(b.group.position);
+  if(d<dist){dist=d;best=b.data;}
+ }
+ return best;
+}
+let selectedBuild=null;
+const keys={};let yaw=0,pitch=0,velocityY=0,onGround=true;
+document.addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='Space'&&onGround){velocityY=7;onGround=false;}});
 document.addEventListener('keyup',e=>keys[e.code]=false);
+renderer.domElement.addEventListener('click',()=>{if(!('ontouchstart'in window)&&document.getElementById('panel').style.display!=='block')renderer.domElement.requestPointerLock();});
+document.addEventListener('mousemove',e=>{if(document.pointerLockElement===renderer.domElement){yaw-=e.movementX*.002;pitch=Math.max(-1.4,Math.min(1.4,pitch-e.movementY*.002));}});
 
-renderer.domElement.addEventListener('click',()=>{
-  if(!isMobile) renderer.domElement.requestPointerLock();
-});
-document.addEventListener('mousemove',e=>{
-  if(document.pointerLockElement===renderer.domElement){
-    yaw-=e.movementX*.002;
-    pitch-=e.movementY*.002;
-    pitch=Math.max(-1.4,Math.min(1.4,pitch));
-  }
-});
-
-const isMobile='ontouchstart' in window;
-if(isMobile){
-  document.getElementById('mobile').style.display='block';
-  document.getElementById('help').textContent='Джойстик — движение · Правая часть экрана — обзор';
+const nodes=[];
+function node(type,x,z){
+ const group=new THREE.Group();let mesh;
+ if(type==='wood'){
+  const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.22,.3,2,6),new THREE.MeshStandardMaterial({color:0x68442b}));trunk.position.y=1;group.add(trunk);
+  const leaves=new THREE.Mesh(new THREE.ConeGeometry(1.2,3,6),new THREE.MeshStandardMaterial({color:0x286b35}));leaves.position.y=3;group.add(leaves);
+ }else{
+  mesh=new THREE.Mesh(new THREE.DodecahedronGeometry(.8),new THREE.MeshStandardMaterial({color:type==='scrap'?0xb6a36b:0x858585}));
+  mesh.position.y=.65;mesh.scale.set(1.2,.8,1);group.add(mesh);
+ }
+ group.position.set(x,0,z);scene.add(group);nodes.push({group,type,hits:0,phase:Math.random()*6});
 }
-
-let moveX=0,moveZ=0;
-const stick=document.getElementById('stick');
-const knob=document.getElementById('knob');
-let stickActive=false;
-
-stick.addEventListener('pointerdown',e=>{
-  stickActive=true;
-  stick.setPointerCapture(e.pointerId);
-  updateStick(e);
-});
-stick.addEventListener('pointermove',e=>{
-  if(stickActive) updateStick(e);
-});
-stick.addEventListener('pointerup',()=>{
-  stickActive=false;moveX=0;moveZ=0;
-  knob.style.left='35px';knob.style.top='35px';
-});
-function updateStick(e){
-  const r=stick.getBoundingClientRect();
-  let x=e.clientX-(r.left+r.width/2);
-  let y=e.clientY-(r.top+r.height/2);
-  const len=Math.hypot(x,y);
-  if(len>35){x=x/len*35;y=y/len*35;}
-  moveX=x/35;moveZ=y/35;
-  knob.style.left=(35+x)+'px';
-  knob.style.top=(35+y)+'px';
-}
-
-let lookPointer=null,lastX=0,lastY=0;
-document.addEventListener('pointerdown',e=>{
-  if(!isMobile || e.target.closest('#stick') || e.target.closest('.control'))return;
-  lookPointer=e.pointerId;lastX=e.clientX;lastY=e.clientY;
-});
-document.addEventListener('pointermove',e=>{
-  if(lookPointer!==e.pointerId)return;
-  yaw-=(e.clientX-lastX)*.006;
-  pitch-=(e.clientY-lastY)*.006;
-  pitch=Math.max(-1.4,Math.min(1.4,pitch));
-  lastX=e.clientX;lastY=e.clientY;
-});
-document.addEventListener('pointerup',()=>lookPointer=null);
-
-document.getElementById('jump').addEventListener('click',()=>{
-  if(onGround){velocityY=7;onGround=false;}
-});
-document.getElementById('hit').addEventListener('click',harvest);
-document.addEventListener('mousedown',e=>{
-  if(e.button===0 && !isMobile) harvest();
-});
+for(let i=0;i<55;i++){let x=(Math.random()-.5)*75,z=(Math.random()-.5)*75;if(Math.abs(x)<5&&Math.abs(z)<5)continue;node(Math.random()>.55?'wood':Math.random()>.5?'stone':'scrap',x,z);}
 
 function harvest(){
-  const origin=camera.position.clone();
-  const direction=new THREE.Vector3();
-  camera.getWorldDirection(direction);
-  const ray=new THREE.Raycaster(origin,direction,0,3.5);
-  const hits=ray.intersectObjects(objects.flatMap(o=>o.mesh.children?.length?[...o.mesh.children]:[o.mesh]),true);
-  if(!hits.length)return;
-  const found=objects.find(o=>o.mesh===hits[0].object || o.mesh===hits[0].object.parent);
-  if(!found)return;
-  found.hits++;
-  if(found.hits>=4){
-    if(found.type==='wood')wood+=found.amount*3;
-    else stone+=found.amount*3;
-    scene.remove(found.mesh);
-    objects.splice(objects.indexOf(found),1);
-    document.getElementById('resources').innerHTML=
-      `🪵 Дерево: ${wood}<br>🪨 Камень: ${stone}`;
-  }
+ const ray=new THREE.Raycaster();const dir=new THREE.Vector3();camera.getWorldDirection(dir);ray.set(camera.position,dir);
+ const hits=ray.intersectObjects(nodes.flatMap(n=>n.group.children),true);if(!hits.length)return;
+ const found=nodes.find(n=>n.group===hits[0].object.parent||n.group.children.includes(hits[0].object));if(!found)return;
+ found.hits++;found.group.rotation.z+=(Math.random()-.5)*.05;
+ if(found.hits>=4){
+  send({type:'harvest',resource:found.type,amount:10});
+  scene.remove(found.group);nodes.splice(nodes.indexOf(found),1);
+  notify('Ресурс отправлен на сервер');
+ }
 }
+let selectedBuildRotation=0;
+document.addEventListener('mousedown',e=>{
+ if(e.button!==0||document.getElementById('panel').style.display==='block')return;
+ if(selectedBuild){
+  const ray=new THREE.Raycaster(),dir=new THREE.Vector3();camera.getWorldDirection(dir);ray.set(camera.position,dir);
+  const hit=ray.intersectObject(ground)[0];
+  if(hit){const p=hit.point.clone();p.x=Math.round(p.x/3)*3;p.z=Math.round(p.z/3)*3;send({type:'build',kind:selectedBuild,position:{x:p.x,y:.1,z:p.z},rotation:selectedBuildRotation});selectedBuild=null;}
+ }else harvest();
+});
 
+let walk=0,hitAnim=0;
 const clock=new THREE.Clock();
 function animate(){
-  requestAnimationFrame(animate);
-  const dt=Math.min(clock.getDelta(),.05);
-
-  let forward=0,side=0;
-  if(keys.KeyW)forward++;
-  if(keys.KeyS)forward--;
-  if(keys.KeyA)side--;
-  if(keys.KeyD)side++;
-  forward-=moveZ;
-  side+=moveX;
-
-  const length=Math.hypot(forward,side);
-  if(length>0){forward/=length;side/=length;}
-
-  camera.position.x+=(-Math.sin(yaw)*forward+Math.cos(yaw)*side)*speed*dt;
-  camera.position.z+=(-Math.cos(yaw)*forward-Math.sin(yaw)*side)*speed*dt;
-
-  velocityY-=18*dt;
-  camera.position.y+=velocityY*dt;
-  if(camera.position.y<1.7){
-    camera.position.y=1.7;velocityY=0;onGround=true;
-  }
-
-  camera.rotation.order='YXZ';
-  camera.rotation.y=yaw;
-  camera.rotation.x=pitch;
-  renderer.render(scene,camera);
+ requestAnimationFrame(animate);const dt=Math.min(clock.getDelta(),.05),t=clock.elapsedTime;
+ let f=(keys.KeyW?1:0)-(keys.KeyS?1:0),s=(keys.KeyD?1:0)-(keys.KeyA?1:0);
+ const len=Math.hypot(f,s);if(len){f/=len;s/=len;walk+=dt*9;}else walk*=Math.max(0,1-dt*6);
+ camera.position.x+=(-Math.sin(yaw)*f+Math.cos(yaw)*s)*5*dt;
+ camera.position.z+=(-Math.cos(yaw)*f-Math.sin(yaw)*s)*5*dt;
+ velocityY-=18*dt;camera.position.y+=velocityY*dt;
+ if(camera.position.y<1.7){camera.position.y=1.7;velocityY=0;onGround=true;}
+ camera.rotation.order='YXZ';camera.rotation.y=yaw;camera.rotation.x=pitch;
+ camera.position.y+=Math.sin(walk)*.025;
+ nodes.forEach(n=>{if(n.type==='wood')n.group.rotation.z=Math.sin(t+n.phase)*.006;});
+ renderer.render(scene,camera);
 }
 animate();
-
-addEventListener('resize',()=>{
-  camera.aspect=innerWidth/innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth,innerHeight);
-});
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
 </script>
 </body>
 </html>
-
